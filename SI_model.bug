@@ -1,0 +1,31 @@
+model {
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      SI[j,t] ~ dbin(p[j,t], y[j,t])
+      
+      y[j,t] ~ dpois(mu[j,t])
+      
+      #mu[j,t] ~ dlnorm(0, 1/9)
+      lambda[j,t] <- mu[j,t] * p[j,t]
+      #mu[j,t] <- lambda[j,t]/p[j,t]
+
+      p[j,t] ~ dunif(0,1)
+      mu[j,t] <- exp(a[j] + b[t])
+
+      #z[j,t] <- ifelse(y[j,t]>0, 1, 0)
+    }
+  }
+  
+  for (j in 1:nsite) {
+    a[j] ~ dnorm(0, tau)
+  }
+  
+  for (t in 1:nyear) {
+    b[t] ~ dnorm(0, tau)
+  }
+  
+  tau <- 1/(sd*sd)
+  sd ~ dunif(0,4)
+  
+
+}
