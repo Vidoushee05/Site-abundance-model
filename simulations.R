@@ -25,6 +25,7 @@ y <- matrix(0, nrow = nsite, ncol = nyear)
 
 a <- rnorm(nsite, 0, 4)
 b <- rnorm(nyear, 0, 4)
+b <- sort(b, decreasing = TRUE) # simulating a decline
 
 for (j in 1: nsite) {
   for (t in 1:nyear) {
@@ -50,9 +51,8 @@ for (j in 1: nsite) {
 data <- list(nyear=nyear, nsite=nsite, SI=sims)
 
 out <- jags(data=data,
-            parameters.to.save=c("y"),
+            parameters.to.save=c("y", "b"),
             model.file="Site-abundance-model/SI_model.bug", 
             n.chains=4, n.iter=40000)
 
 ###################################################################
-
