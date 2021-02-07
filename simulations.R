@@ -170,4 +170,26 @@ sims2$species <- "species2"
 
 sim <- rbind(sims1, sims2)
 
+######################################
 
+# formatting the data to run JAGS
+
+# for each species
+
+source("functions.R")
+
+simdata <- create_data(15,50,10)
+
+simdata1 <- subset(simdata, species==species_name)
+simdata1 <- dcast(data = simdata1,formula = site~year,fun.aggregate = sum,value.var = "observed")
+rownames(simdata1) <- simdata1$site
+simdata1 <- simdata1[,-1]
+
+#data <- list(nsite = nrow(simdata1), nyear = ncol(simdata1), SI = simdata1)
+
+# out <- jags(data=data,
+#             parameters.to.save=c("y", "b"),
+#             model.file="SI_model.bug", 
+#             n.chains=4, n.iter=50000)
+
+out <- run_model(simdata, species_list = c("species1"), n_iter=50000)
