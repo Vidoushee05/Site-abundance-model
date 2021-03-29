@@ -511,6 +511,7 @@ create_data1 <- function(nspecies=20, nsite=100, nyear=10, decline=FALSE) {
 
 ###############################################
 
+# with visits
 create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
@@ -575,6 +576,7 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
 
 ##############################################
 
+# simulating increase in prob of focal detection
 create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
@@ -599,7 +601,7 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
   }
   
   for(t in 1:nyear) {
-    p_detect[t,1] <- 0.4+(t-1)/90
+    p_detect[t,1] <- 0.4+(t-1)/((nyear-1)/0.1)
   }
   
   if (decline) {b[,1] <- d}
@@ -638,3 +640,85 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
   
   return(out)
 }
+
+##############################################
+
+# reduced recording effort
+create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
+  simdata <- data.frame()
+  a <- matrix(nrow = nsite, ncol=nspecies+1)
+  b <- matrix(nrow = nyear, ncol=nspecies+1)
+  p_detect <- rep(0, nspecies+1)
+  lambda <- array(dim=c(nsite, nyear, nspecies+1))
+  y <- array(dim=c(nsite, nyear, nspecies+1))
+  
+  if (decline) {
+    # simulating a 30% decline in focal occupancy over 10 years
+    d <- rep(0,nyear)
+    d[1] <- rnorm(1, 0, 3)
+    d[nyear] <- d[1] + log(0.7)
+    d[2:(nyear-1)] <- runif(nyear-2, d[nyear], d[1])
+    d[2:(nyear-1)] <- sort(d[2:(nyear-1)], decreasing = TRUE)
+  }
+  
+  for (i in 1:(nspecies+1)) {
+    a[,i] <- rnorm(nsite, 0, 3)
+    b[,i] <- rnorm(nyear, 0, 3)
+    p_detect[i] <- rbeta(1, 2, 2)
+  }
+  
+  p_detect[1] <- 0.5  #fixed prob of detection for focal
+  
+  if (decline) {b[,1] <- d}
+  
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      lambda[j,t,] <- exp(a[j,]+b[t,])
+      f1 <- function(x) rpois(1,x)
+      y[j,t,] <- sapply(lambda[j,t,], f1)
+      richness <- length(which(y[j,t,]!=0))/(nspecies+1)
+      
+      nvisits <- rbinom(1, mv, richness)
+      
+      f2 <- function(x, p_detect) rbinom(nvisits, x, p_detect)
+      sim <- sapply(y[j,t,], f2, p_detect=p_detect)
+      if (nvisits==0) {
+        sim <- data.frame(NULL)
+      }
+      else{
+        sim <- reshape2::melt(sim)
+        if (nvisits==1) {
+          sim <- data.frame(rep(1,nspecies+1),1:(nspecies+1),sim[,1])
+        }
+        colnames(sim) <- c("visit", "species", "obs")
+        f3 <- function(x) rep(x, nvisits)
+        sim$actual <- sapply(y[j,t,], f3)[1:length(sim$visit)]
+        sim$site <- j
+        sim$year <- t
+      }
+      simdata <- rbind(simdata, sim)
+    }
+  }
+  
+  #increase short lists from 10% to 30%
+  for (t in 1:nyear) {
+    single <- 0.1+(t-1)/((nyear-1)/0.2)
+    sub <- subset(simdata, year==t)
+    vis <- unique(sub[,c("visit", "site")])
+    sel <- vis[sample(nrow(vis), single*nrow(vis)),]
+    for (i in 1:nrow(sel)) {
+      sub <- match_df(sub, sel[i,])
+      sp <- sample(1:(nspecies+1), 1)
+      sub <- subset(sub, species!=sp)
+      simdata <- simdata[-as.integer(rownames(sub)),]
+      sub <- subset(simdata, year==t)
+    }
+  }
+  
+  out <- list()
+  out[["data"]] <- simdata
+  out[["params"]] <- b
+  
+  return(out)
+}
+
