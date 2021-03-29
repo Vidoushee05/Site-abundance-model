@@ -5,25 +5,38 @@ model {
       
       y[j,t] ~ dpois(mu[j,t])
       
-      lambda[j,t] <- mu[j,t] * p[j,t]
+      lambda[j,t] <- mu[j,t] * p[j,t] * z[j,t]
 
       p[j,t] ~ dunif(0,1)
-      mu[j,t] <- exp(a[j] + b[t])
+      #logit(p[j,t]) <- v[t]
+      mu[j,t] <- exp(a[j] + b[t] + c)
 
-      #z[j,t] <- ifelse(y[j,t]>0, 1, 0)
+      z[j,t] <- ifelse(y[j,t]>0, 1, 0)
     }
   }
   
   for (j in 1:nsite) {
-    a[j] ~ dnorm(0, tau)
+    a[j] ~ dnorm(mu.a[j],tau.a)
+    mu.a[j] ~ dnorm(0,1/100)
+    #u[j] ~ dnorm(0,tau.u)
   }
   
   for (t in 1:nyear) {
-    b[t] ~ dnorm(0, tau)
+    b[t] ~ dnorm(mu.b[t],tau.b)
+    mu.b[t] ~ dnorm(0,1/100)
+    #v[t] ~ dnorm(mu.b, tau.v)
   }
   
-  tau <- 1/(sd*sd)
-  sd ~ dunif(0,6)
+  tau.a <- 1/(sd.a*sd.a)
+  sd.a ~ dunif(0,10)
+  tau.b <- 1/(sd.b*sd.b)
+  sd.b ~ dunif(0,10)
+  tau.v <- 1/(sd.v*sd.v)
+  sd.v ~ dunif(0,5)
   
+  c ~ dnorm(0, tau.c)
+  mu.c ~ dnorm(0,1/100)
+  tau.c <- 1/(sd.c*sd.c)
+  sd.c ~ dunif(0,1E6)
 
 }
