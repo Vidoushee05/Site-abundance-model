@@ -184,7 +184,8 @@ run_model <- function(simdata, species_list=unique(data$species), n_chains=4, n_
     output[[i]] <- jags(data=jags_data,
                         parameters.to.save=c("a", "b", "c"),
                         model.file="SI_model.bug", 
-                        n.chains=n_chains, n.iter=n_iter)
+                        n.chains=n_chains, n.iter=n_iter,
+                        progress.bar = "none")
   }
   
   return(list(output, missing))
@@ -354,7 +355,7 @@ create_data.nb <- function(nspecies=20, nsite=100, nyear=10, decline=FALSE) {
 ###############################################
 
 # with visits
-create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
+create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -386,6 +387,10 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
       lambda[j,t,] <- exp(a[j,]+b[t,])
       f1 <- function(x) rpois(1,x)
       y[j,t,] <- sapply(lambda[j,t,], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,] <- sapply(lambda[j,t,], f11)
+      }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
       nvisits <- rbinom(1, mv, richness)
@@ -419,7 +424,7 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
 ##############################################
 
 # simulating increase in prob of focal detection
-create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
+create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -453,6 +458,10 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
       lambda[j,t,] <- exp(a[j,]+b[t,])
       f1 <- function(x) rpois(1,x)
       y[j,t,] <- sapply(lambda[j,t,], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,] <- sapply(lambda[j,t,], f11)
+      }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
       nvisits <- rbinom(1, mv, richness)
@@ -486,7 +495,7 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
 ##############################################
 
 # reduced recording effort
-create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
+create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -518,6 +527,10 @@ create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
       lambda[j,t,] <- exp(a[j,]+b[t,])
       f1 <- function(x) rpois(1,x)
       y[j,t,] <- sapply(lambda[j,t,], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,] <- sapply(lambda[j,t,], f11)
+      }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
       nvisits <- rbinom(1, mv, richness)
@@ -567,7 +580,7 @@ create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
 ##############################################
 
 # visits double over 10 years
-create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
+create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -599,6 +612,10 @@ create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
       lambda[j,t,] <- exp(a[j,]+b[t,])
       f1 <- function(x) rpois(1,x)
       y[j,t,] <- sapply(lambda[j,t,], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,] <- sapply(lambda[j,t,], f11)
+      }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
       nvisits <- rbinom(1, mv, richness)
@@ -645,7 +662,7 @@ create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
 ##############################################
 
 # increased visits biased towards focal
-create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
+create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -677,6 +694,10 @@ create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE){
       lambda[j,t,] <- exp(a[j,]+b[t,])
       f1 <- function(x) rpois(1,x)
       y[j,t,] <- sapply(lambda[j,t,], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,] <- sapply(lambda[j,t,], f11)
+      }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
       nvisits <- rbinom(1, mv, richness)

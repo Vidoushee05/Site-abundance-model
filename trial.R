@@ -287,7 +287,7 @@ for (j in 1:nsite) {
 for (i in 1:10) {x[i] <- mean(subset(simdata, species==1 & year==i)$obs)}
 for (i in 1:10) {x[i] <- mean(subset(simdata, species=="species1" & year==paste0("year", i))$actual)}
 
-data <- create_data5(decline=FALSE)
+data <- create_data2(decline=FALSE, nb=TRUE)
 simdata <- data[[1]]
 
 out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
@@ -306,3 +306,27 @@ p <- ggplot(est, aes(year, mean)) + geom_line(aes(color="Estimated")) +
   geom_point(data=est, aes(year, actual, color="Actual")) + ylab("b_t") +
   scale_x_continuous(breaks=seq(1, 10, by=1)) +
   theme(legend.title = element_blank()) 
+
+##################################################
+
+nsims = 50
+test <- c()
+
+for (i in 1:nsims) {
+  data <- create_data2(decline=TRUE)
+  simdata <- data[[1]]
+  
+  out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
+  
+  est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
+  est <- as.data.frame(est)
+  est$year <- 1:nyear
+  
+  lntrend <- summary(lm(mean~year, data=est))
+  test[i] <- lntrend$coefficients[2,4]<0.05
+  print(paste0("Simulation ", i, " completed."))
+}
+
+
+
+
