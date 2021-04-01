@@ -287,7 +287,8 @@ for (j in 1:nsite) {
 for (i in 1:10) {x[i] <- mean(subset(simdata, species==1 & year==i)$obs)}
 for (i in 1:10) {x[i] <- mean(subset(simdata, species=="species1" & year==paste0("year", i))$actual)}
 
-data <- create_data2(decline=FALSE, nb=TRUE)
+
+data <- create_data2(decline=FALSE, nb=FALSE)
 simdata <- data[[1]]
 
 out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
@@ -365,3 +366,4 @@ for (s in LETTERS[1:5]) {
 }
 
 resultsA <- assess_model(scenarios = "A")
+save(resultsA, file="results/Control.rdata")
