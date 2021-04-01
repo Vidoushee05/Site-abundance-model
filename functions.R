@@ -3,6 +3,16 @@ require(R2jags)
 require(zoo)
 require(dplyr)
 
+match_df <- function (x, y, on = NULL) {
+  if (is.null(on)) {
+    on <- intersect(names(x), names(y))
+  }
+  keys <- join.keys(x, y, on)
+  x[keys$x %in% keys$y, , drop = FALSE]
+}
+
+#############################
+
 create_data <- function(nspecies=20, nsite=100, nyear=10, decline=FALSE) {
   # one focal species - probability of detection=0.5
   
@@ -160,35 +170,6 @@ create_data <- function(nspecies=20, nsite=100, nyear=10, decline=FALSE) {
   
   return(simulations)
   
-}
-
-###############################
-
-run_model <- function(simdata, species_list=unique(data$species), n_chains=4, n_iter=10000) {
-  output <- list()
-  missing <- list()
-  
-  for (i in species_list) {
-    simdata1 <- subset(simdata, species==i)
-    simdata1 <- reshape2::dcast(data = simdata1,formula = site~year,
-                                fun.aggregate = function(x) round(mean(x)),
-                                value.var = "obs")
-    #rownames(simdata1) <- simdata1$site
-    simdata1 <- simdata1[,-1]
-    missing[[i]] <- sum(is.na(simdata1))/prod(dim(simdata1))
-    simdata1 <- t(apply(simdata1, 1, na.locf, na.rm=FALSE))
-    simdata1 <- t(apply(simdata1, 1, na.locf, fromLast=T))
-    
-    jags_data <- list(nsite = nrow(simdata1), nyear = ncol(simdata1), SI = simdata1)
-    
-    output[[i]] <- jags(data=jags_data,
-                        parameters.to.save=c("a", "b", "c"),
-                        model.file="SI_model.bug", 
-                        n.chains=n_chains, n.iter=n_iter,
-                        progress.bar = "none")
-  }
-  
-  return(list(output, missing))
 }
 
 ###############################################
@@ -749,3 +730,91 @@ create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   return(out)
 }
 
+##############################################
+
+# run abundance model
+run_model <- function(simdata, species_list=1, model="SI_model.bug", n_chains=3, n_iter=5000) {
+  output <- list()
+  missing <- list()
+  
+  for (i in species_list) {
+    simdata1 <- subset(simdata, species==i)
+    simdata1 <- reshape2::dcast(data = simdata1,formula = site~year,
+                                fun.aggregate = function(x) round(mean(x)),
+                                value.var = "obs")
+    #rownames(simdata1) <- simdata1$site
+    simdata1 <- simdata1[,-1]
+    missing[[i]] <- sum(is.na(simdata1))/prod(dim(simdata1))
+    simdata1 <- t(apply(simdata1, 1, na.locf, na.rm=FALSE))
+    simdata1 <- t(apply(simdata1, 1, na.locf, fromLast=T))
+    
+    jags_data <- list(nsite = nrow(simdata1), nyear = ncol(simdata1), SI = simdata1)
+    
+    output[[i]] <- jags(data=jags_data,
+                        parameters.to.save=c("a", "b", "c"),
+                        model.file=model, 
+                        n.chains=n_chains, n.iter=n_iter,
+                        progress.bar = "none")
+  }
+  
+  return(list(output, missing))
+}
+
+##############################################
+
+# function to run 100 simulations and record error rate/power
+assess_model <- function(nsims=100, scenarios="ABCDE", species_list=1, model="SI_model.bug", n_chains=3, n_iter=5000) {
+  results <- list()
+  create <- list(create_data2, create_data3, create_data4,
+                 create_data5, create_data6)
+  
+  for (s in LETTERS[1:5]) {
+    
+    if (grepl(s, scenarios)) {
+      test1 <- c()
+      test2 <- c()
+      miss <- c()
+      
+      for (i in 1:nsims) {
+        data <- create[[which(LETTERS==s)]](decline=FALSE)
+        simdata <- data[[1]]
+        
+        out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
+        miss[i] <- out[[2]][[1]]
+        
+        est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
+        est <- as.data.frame(est)
+        est$year <- 1:nyear
+        
+        lntrend <- summary(lm(mean~year, data=est))
+        test1[i] <- lntrend$coefficients[2,4]<0.05
+        print(paste0("Scenario ", s, " + no trend: simulation ", i, " completed."))
+      }
+      
+      for (i in 1:nsims) {
+        data <- create[[which(LETTERS==s)]](decline=TRUE)
+        simdata <- data[[1]]
+        
+        out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
+        miss[nsims+1] <- out[[2]][[1]]
+        
+        est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
+        est <- as.data.frame(est)
+        est$year <- 1:nyear
+        
+        lntrend <- summary(lm(mean~year, data=est))
+        test2[i] <- lntrend$coefficients[2,4]<0.05
+        print(paste0("Scenario ", s, " + decline: simulation ", i, " completed."))
+      }
+      
+      errorI <- sum(test1)/length(test1)
+      errorII <- 1 - sum(test2)/length(test2)
+      power <- max(0, 1-(errorI+errorII))
+      avgmiss <- mean(miss)
+      
+      results[[s]] <- list(alpha=errorI, beta=errorII, power=power, avgmiss=avgmiss)
+    }
+  }
+  
+  return(results)
+}

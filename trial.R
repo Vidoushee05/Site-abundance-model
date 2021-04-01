@@ -309,24 +309,59 @@ p <- ggplot(est, aes(year, mean)) + geom_line(aes(color="Estimated")) +
 
 ##################################################
 
-nsims = 50
-test <- c()
+nsims = 1
+scenarios = "ABCDE"
+results <- list()
 
-for (i in 1:nsims) {
-  data <- create_data2(decline=TRUE)
-  simdata <- data[[1]]
-  
-  out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
-  
-  est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
-  est <- as.data.frame(est)
-  est$year <- 1:nyear
-  
-  lntrend <- summary(lm(mean~year, data=est))
-  test[i] <- lntrend$coefficients[2,4]<0.05
-  print(paste0("Simulation ", i, " completed."))
+create <- list(create_data2, create_data3, create_data4,
+               create_data5, create_data6)
+
+for (s in LETTERS[1:5]) {
+
+  if (grepl(s, scenarios)) {
+    test1 <- c()
+    test2 <- c()
+    miss <- c()
+    
+    for (i in 1:nsims) {
+      data <- create[[which(LETTERS==s)]](decline=FALSE)
+      simdata <- data[[1]]
+      
+      out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
+      miss[i] <- out[[2]][[1]]
+      
+      est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
+      est <- as.data.frame(est)
+      est$year <- 1:nyear
+      
+      lntrend <- summary(lm(mean~year, data=est))
+      test1[i] <- lntrend$coefficients[2,4]<0.05
+      print(paste0("Scenario ", s, " + no trend: simulation ", i, " completed."))
+    }
+    
+    for (i in 1:nsims) {
+      data <- create[[which(LETTERS==s)]](decline=TRUE)
+      simdata <- data[[1]]
+      
+      out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
+      miss[nsims+1] <- out[[2]][[1]]
+      
+      est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
+      est <- as.data.frame(est)
+      est$year <- 1:nyear
+      
+      lntrend <- summary(lm(mean~year, data=est))
+      test2[i] <- lntrend$coefficients[2,4]<0.05
+      print(paste0("Scenario ", s, " + decline: simulation ", i, " completed."))
+    }
+    
+    errorI <- sum(test1)/length(test1)
+    errorII <- 1 - sum(test2)/length(test2)
+    power <- max(0, 1-(errorI+errorII))
+    avgmiss <- mean(miss)
+    
+    results[[s]] <- list(alpha=errorI, beta=errorII, power=power, avgmiss=avgmiss)
+  }
 }
 
-
-
-
+resultsA <- assess_model(scenarios = "A")
