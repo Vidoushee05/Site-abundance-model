@@ -2,6 +2,7 @@ require(reshape2)
 require(R2jags)
 require(zoo)
 require(dplyr)
+require(plyr)
 
 match_df <- function (x, y, on = NULL) {
   if (is.null(on)) {
@@ -11,332 +12,10 @@ match_df <- function (x, y, on = NULL) {
   x[keys$x %in% keys$y, , drop = FALSE]
 }
 
-#############################
-
-create_data <- function(nspecies=20, nsite=100, nyear=10, decline=FALSE) {
-  # one focal species - probability of detection=0.5
-  
-  lambda <- matrix(0, nrow = nsite, ncol = nyear)
-  
-  y <- matrix(0, nrow = nsite, ncol = nyear)
-  
-  a <- rnorm(nsite, 0, 3)
-  if (decline==FALSE) {b <- rnorm(nyear, 0, 3)}
-  
-  if (decline==TRUE) {
-    # simulating a 30% decline in occupancy over 10 years
-    b <- rep(0,nyear)
-    b[1] <- rnorm(1, 0, 3)
-    b[nyear] <- b[1] + log(0.7)
-    b[2:(nyear-1)] <- runif(nyear-2, b[nyear], b[1])
-    b[2:(nyear-1)] <- sort(b[2:(nyear-1)], decreasing = TRUE)
-  }
-  
-
-  for (j in 1: nsite) {
-    for (t in 1:nyear) {
-      lambda[j,t] <- exp(a[j] + b[t])
-      y[j,t] <- rpois(1, lambda[j,t])
-    }
-  }
-  y <- as.data.frame(y)
-  
-  # store values of b
-  trend <- data.frame(species="species1", year="year1", b_t=b[1], stringsAsFactors = FALSE)
-  for (t in 2:nyear) {
-    trend[t,] <- c("species1", paste0("year", t), b[t])
-  }
-  
-  # simulate observed abundance
-  
-  simfocal <- matrix(0, nrow = nsite, ncol = nyear)
-  simfocal <- as.data.frame(simfocal)
-  
-  x <- rep(0,nyear)
-  
-  for (t in 1:nyear) {
-    x[t] <- paste0("year", t)
-  }
-  
-  colnames(simfocal) <- x
-  colnames(y) <- x
-  
-  x <- rep(0, nsite)
-  
-  for (j in 1:nsite) {
-    x[j] <- paste0("site", j)
-  }
-  
-  simfocal$site <- x
-  y$site <- x
-  
-  z <- ifelse(y==0, 0, 1)
-  
-  p <- matrix(0, nrow = nsite, ncol = nyear)
-  
-  for (j in 1: nsite) {
-    for (t in 1:nyear) {
-      # fixed probability of detection
-      p[j,t] <- 0.5
-      simfocal[j,t] <- rbinom(1, y[j,t], p[j,t]*z[j,t])
-    }
-  }
-  
-  simfocal <- reshape2::melt(simfocal, id.vars = "site")
-  simfocal$species <- "species1"
-  colnames(simfocal) <- c("site", "year", "observed", "species")
-  y <- reshape2::melt(y, id.vars = "site")
-  colnames(y) <- c("site", "year", "actual")
-   
-  simdata <- merge(simfocal, y)
-  
-  # non-focal species
-  
-  for (i in 1:nspecies) {
-    
-    lambda <- matrix(0, nrow = nsite, ncol = nyear)
-    
-    y <- matrix(0, nrow = nsite, ncol = nyear)
-    
-    a <- rnorm(nsite, 0, 3)
-    b <- rnorm(nyear, 0, 3)
-    
-    for (j in 1: nsite) {
-      for (t in 1:nyear) {
-        lambda[j,t] <- exp(a[j] + b[t])
-        y[j,t] <- rpois(1, lambda[j,t])
-      }
-    }
-    y <- as.data.frame(y)
-    
-    trend2 <- data.frame(species=paste("species", i+1), year="year1", b_t=b[1], stringsAsFactors = FALSE)
-    for (t in 2:nyear) {
-      trend2[t,] <- c(paste0("species", i+1), paste0("year", t), b[t])
-    }
-    trend <- rbind(trend, trend2)
-    
-    # simulate observed abundance
-    
-    sims2 <- matrix(0, nrow = nsite, ncol = nyear)
-    sims2 <- as.data.frame(sims2)
-    
-    x <- rep(0,nyear)
-    
-    for (t in 1:nyear) {
-      x[t] <- paste0("year", t)
-    }
-    
-    colnames(sims2) <- x
-    colnames(y) <- x
-    
-    x <- rep(0, nsite)
-    
-    for (j in 1:nsite) {
-      x[j] <- paste0("site", j)
-    }
-    
-    sims2$site <- x
-    y$site <- x
-    
-    z <- ifelse(y==0, 0, 1)
-    
-    p <- matrix(0, nrow = nsite, ncol = nyear)
-    
-    for (j in 1: nsite) {
-      for (t in 1:nyear) {
-        # beta distribution from Isaac et al.
-        p[j,t] <- rbeta(1, 2, 2)
-        sims2[j,t] <- rbinom(1, y[j,t], p[j,t]*z[j,t])
-      }
-    }
-    
-    sims2 <- reshape2::melt(sims2, id.vars = "site")
-    sims2$species <- paste0("species", (i+1))
-    
-    colnames(sims2) <- c("site", "year", "observed", "species")
-    y <- reshape2::melt(y, id.vars = "site")
-    colnames(y) <- c("site", "year", "actual")
-    
-    sims2 <- merge(sims2, y)
-
-    simdata <- rbind(simdata, sims2)
-  }
-  
-  trend$b_t <- round(as.numeric(trend$b_t),2)
-  simdata$site <- factor(simdata$site, levels = paste0("site", 1:nsite))
-  simdata$species <- as.factor(simdata$species)
-  
-  simulations <- list(simdata, trend)
-  
-  return(simulations)
-  
-}
-
-###############################################
-
-create_data.nb <- function(nspecies=20, nsite=100, nyear=10, decline=FALSE) {
-  # one focal species - probability of detection=0.5
-  
-  lambda <- matrix(0, nrow = nsite, ncol = nyear)
-  
-  y <- matrix(0, nrow = nsite, ncol = nyear)
-  
-  a <- rexp(nsite, 1.5)
-  if (decline==FALSE) {b <- rexp(nyear, 1.5)}
-  
-  if (decline==TRUE) {
-    # simulating a 30% decline in occupancy over 10 years
-    b <- rep(0,nyear)
-    b[1] <- rexp(1, 1.5)
-    b[nyear] <- b[1] + log(0.7)
-    b[2:(nyear-1)] <- runif(nyear-2, b[nyear], b[1])
-    b[2:(nyear-1)] <- sort(b[2:(nyear-1)], decreasing = TRUE)
-  }
-  
-  
-  for (j in 1: nsite) {
-    for (t in 1:nyear) {
-      lambda[j,t] <- exp(a[j] + b[t])
-      y[j,t] <- rnbinom(1, lambda[j,t], 0.29)
-    }
-  }
-  y <- as.data.frame(y)
-  
-  # store values of b
-  trend <- data.frame(species="species1", year="year1", b_t=b[1], stringsAsFactors = FALSE)
-  for (t in 2:nyear) {
-    trend[t,] <- c("species1", paste0("year", t), b[t])
-  }
-  
-  # simulate observed abundance
-  
-  simfocal <- matrix(0, nrow = nsite, ncol = nyear)
-  simfocal <- as.data.frame(simfocal)
-  
-  x <- rep(0,nyear)
-  
-  for (t in 1:nyear) {
-    x[t] <- paste0("year", t)
-  }
-  
-  colnames(simfocal) <- x
-  colnames(y) <- x
-  
-  x <- rep(0, nsite)
-  
-  for (j in 1:nsite) {
-    x[j] <- paste0("site", j)
-  }
-  
-  simfocal$site <- x
-  y$site <- x
-  
-  z <- ifelse(y==0, 0, 1)
-  
-  p <- matrix(0, nrow = nsite, ncol = nyear)
-  
-  for (j in 1: nsite) {
-    for (t in 1:nyear) {
-      # fixed probability of detection
-      p[j,t] <- 0.5
-      simfocal[j,t] <- rbinom(1, y[j,t], p[j,t]*z[j,t])
-    }
-  }
-  
-  simfocal <- reshape2::melt(simfocal, id.vars = "site")
-  simfocal$species <- "species1"
-  colnames(simfocal) <- c("site", "year", "observed", "species")
-  y <- reshape2::melt(y, id.vars = "site")
-  colnames(y) <- c("site", "year", "actual")
-  
-  simdata <- merge(simfocal, y)
-  
-  # non-focal species
-  
-  for (i in 1:nspecies) {
-    
-    lambda <- matrix(0, nrow = nsite, ncol = nyear)
-    
-    y <- matrix(0, nrow = nsite, ncol = nyear)
-    
-    a <- rexp(nsite, 1.5)
-    b <- rexp(nyear, 1.5)
-    
-    for (j in 1: nsite) {
-      for (t in 1:nyear) {
-        lambda[j,t] <- exp(a[j] + b[t])
-        y[j,t] <- rnbinom(1, lambda[j,t], 0.29)
-      }
-    }
-    y <- as.data.frame(y)
-    
-    trend2 <- data.frame(species=paste("species", i+1), year="year1", b_t=b[1], stringsAsFactors = FALSE)
-    for (t in 2:nyear) {
-      trend2[t,] <- c(paste0("species", i+1), paste0("year", t), b[t])
-    }
-    trend <- rbind(trend, trend2)
-    
-    # simulate observed abundance
-    
-    sims2 <- matrix(0, nrow = nsite, ncol = nyear)
-    sims2 <- as.data.frame(sims2)
-    
-    x <- rep(0,nyear)
-    
-    for (t in 1:nyear) {
-      x[t] <- paste0("year", t)
-    }
-    
-    colnames(sims2) <- x
-    colnames(y) <- x
-    
-    x <- rep(0, nsite)
-    
-    for (j in 1:nsite) {
-      x[j] <- paste0("site", j)
-    }
-    
-    sims2$site <- x
-    y$site <- x
-    
-    z <- ifelse(y==0, 0, 1)
-    
-    p <- matrix(0, nrow = nsite, ncol = nyear)
-    
-    for (j in 1: nsite) {
-      for (t in 1:nyear) {
-        # beta distribution from Isaac et al.
-        p[j,t] <- rbeta(1, 2, 2)
-        sims2[j,t] <- rbinom(1, y[j,t], p[j,t]*z[j,t])
-      }
-    }
-    
-    sims2 <- reshape2::melt(sims2, id.vars = "site")
-    sims2$species <- paste0("species", (i+1))
-    
-    colnames(sims2) <- c("site", "year", "observed", "species")
-    y <- reshape2::melt(y, id.vars = "site")
-    colnames(y) <- c("site", "year", "actual")
-    
-    sims2 <- merge(sims2, y)
-    
-    simdata <- rbind(simdata, sims2)
-  }
-  
-  trend$b_t <- round(as.numeric(trend$b_t),2)
-  simdata$site <- factor(simdata$site, levels = paste0("site", 1:nsite))
-  simdata$species <- as.factor(simdata$species)
-  
-  simulations <- list(simdata, trend)
-  
-  return(simulations)
-  
-}
-
 ###############################################
 
 # with visits
-create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
+create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -347,19 +26,30 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   if (decline) {
     # simulating a 30% decline in focal occupancy over 10 years
     d <- rep(0,nyear)
-    d[1] <- rnorm(1, 0, 3)
+    d[1] <- rnorm(1, 0, var_params)
     d[nyear] <- d[1] + log(0.7)
     d[2:(nyear-1)] <- runif(nyear-2, d[nyear], d[1])
     d[2:(nyear-1)] <- sort(d[2:(nyear-1)], decreasing = TRUE)
   }
   
   for (i in 1:(nspecies+1)) {
-    a[,i] <- rnorm(nsite, 0, 3)
-    b[,i] <- rnorm(nyear, 0, 3)
+    a[,i] <- rnorm(nsite, 0, var_params)
+    b[,i] <- rnorm(nyear, 0, var_params)
     p_detect[i] <- rbeta(1, 2, 2)
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
+  
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      while (sum(a[j,]+b[t,]>12.2)>0) {
+        for (i in 1:(nspecies+1)) {
+          a[,i] <- rnorm(nsite, 0, var_params)
+          b[,i] <- rnorm(nyear, 0, var_params)
+        }
+      }
+    }
+  }
   
   if (decline) {b[,1] <- d}
   
@@ -405,7 +95,7 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # simulating increase in prob of focal detection
-create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
+create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -416,20 +106,32 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   if (decline) {
     # simulating a 30% decline in focal occupancy over 10 years
     d <- rep(0,nyear)
-    d[1] <- rnorm(1, 0, 3)
+    d[1] <- rnorm(1, 0, var_params)
     d[nyear] <- d[1] + log(0.7)
     d[2:(nyear-1)] <- runif(nyear-2, d[nyear], d[1])
     d[2:(nyear-1)] <- sort(d[2:(nyear-1)], decreasing = TRUE)
   }
   
   for (i in 1:(nspecies+1)) {
-    a[,i] <- rnorm(nsite, 0, 3)
-    b[,i] <- rnorm(nyear, 0, 3)
+    a[,i] <- rnorm(nsite, 0, var_params)
+    b[,i] <- rnorm(nyear, 0, var_params)
     p_detect[,i] <- rbeta(1, 2, 2)
   }
   
+  # detection increases
   for(t in 1:nyear) {
     p_detect[t,1] <- 0.4+(t-1)/((nyear-1)/0.1)
+  }
+  
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      while (sum(a[j,]+b[t,]>12.2)>0) {
+        for (i in 1:(nspecies+1)) {
+          a[,i] <- rnorm(nsite, 0, var_params)
+          b[,i] <- rnorm(nyear, 0, var_params)
+        }
+      }
+    }
   }
   
   if (decline) {b[,1] <- d}
@@ -476,7 +178,7 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # reduced recording effort
-create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
+create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -487,16 +189,27 @@ create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   if (decline) {
     # simulating a 30% decline in focal occupancy over 10 years
     d <- rep(0,nyear)
-    d[1] <- rnorm(1, 0, 3)
+    d[1] <- rnorm(1, 0, var_params)
     d[nyear] <- d[1] + log(0.7)
     d[2:(nyear-1)] <- runif(nyear-2, d[nyear], d[1])
     d[2:(nyear-1)] <- sort(d[2:(nyear-1)], decreasing = TRUE)
   }
   
   for (i in 1:(nspecies+1)) {
-    a[,i] <- rnorm(nsite, 0, 3)
-    b[,i] <- rnorm(nyear, 0, 3)
+    a[,i] <- rnorm(nsite, 0, var_params)
+    b[,i] <- rnorm(nyear, 0, var_params)
     p_detect[i] <- rbeta(1, 2, 2)
+  }
+  
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      while (sum(a[j,]+b[t,]>12.2)>0) {
+        for (i in 1:(nspecies+1)) {
+          a[,i] <- rnorm(nsite, 0, var_params)
+          b[,i] <- rnorm(nyear, 0, var_params)
+        }
+      }
+    }
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
@@ -561,7 +274,7 @@ create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # visits double over 10 years
-create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
+create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -572,19 +285,30 @@ create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   if (decline) {
     # simulating a 30% decline in focal occupancy over 10 years
     d <- rep(0,nyear)
-    d[1] <- rnorm(1, 0, 3)
+    d[1] <- rnorm(1, 0, var_params)
     d[nyear] <- d[1] + log(0.7)
     d[2:(nyear-1)] <- runif(nyear-2, d[nyear], d[1])
     d[2:(nyear-1)] <- sort(d[2:(nyear-1)], decreasing = TRUE)
   }
   
   for (i in 1:(nspecies+1)) {
-    a[,i] <- rnorm(nsite, 0, 3)
-    b[,i] <- rnorm(nyear, 0, 3)
+    a[,i] <- rnorm(nsite, 0, var_params)
+    b[,i] <- rnorm(nyear, 0, var_params)
     p_detect[i] <- rbeta(1, 2, 2)
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
+  
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      while (sum(a[j,]+b[t,]>12.2)>0) {
+        for (i in 1:(nspecies+1)) {
+          a[,i] <- rnorm(nsite, 0, var_params)
+          b[,i] <- rnorm(nyear, 0, var_params)
+        }
+      }
+    }
+  }
   
   if (decline) {b[,1] <- d}
   
@@ -643,7 +367,7 @@ create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # increased visits biased towards focal
-create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE){
+create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -654,19 +378,30 @@ create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   if (decline) {
     # simulating a 30% decline in focal occupancy over 10 years
     d <- rep(0,nyear)
-    d[1] <- rnorm(1, 0, 3)
+    d[1] <- rnorm(1, 0, var_params)
     d[nyear] <- d[1] + log(0.7)
     d[2:(nyear-1)] <- runif(nyear-2, d[nyear], d[1])
     d[2:(nyear-1)] <- sort(d[2:(nyear-1)], decreasing = TRUE)
   }
   
   for (i in 1:(nspecies+1)) {
-    a[,i] <- rnorm(nsite, 0, 3)
-    b[,i] <- rnorm(nyear, 0, 3)
+    a[,i] <- rnorm(nsite, 0, var_params)
+    b[,i] <- rnorm(nyear, 0, var_params)
     p_detect[i] <- rbeta(1, 2, 2)
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
+  
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      while (sum(a[j,]+b[t,]>12.2)>0) {
+        for (i in 1:(nspecies+1)) {
+          a[,i] <- rnorm(nsite, 0, var_params)
+          b[,i] <- rnorm(nyear, 0, var_params)
+        }
+      }
+    }
+  }
   
   if (decline) {b[,1] <- d}
   
@@ -782,6 +517,7 @@ assess_model <- function(nsims=100, scenarios="ABCDE", species_list=1, model="SI
         out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
         miss[i] <- out[[2]][[1]]
         
+        nyear <- formals(create[[which(LETTERS==s)]])$nyear
         est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
         est <- as.data.frame(est)
         est$year <- 1:nyear
@@ -798,6 +534,7 @@ assess_model <- function(nsims=100, scenarios="ABCDE", species_list=1, model="SI
         out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
         miss[nsims+1] <- out[[2]][[1]]
         
+        nyear <- formals(create[[which(LETTERS==s)]])$nyear
         est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
         est <- as.data.frame(est)
         est$year <- 1:nyear
