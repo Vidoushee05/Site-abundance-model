@@ -22,15 +22,6 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   p_detect <- rep(0, nspecies+1)
   lambda <- array(dim=c(nsite, nyear, nspecies+1))
   y <- array(dim=c(nsite, nyear, nspecies+1))
-
-  if (decline) {
-    # simulating a 30% decline in focal occupancy over 10 years
-    d <- rep(0,nyear)
-    d[1] <- rnorm(1, 0, var_params)
-    d[nyear] <- d[1] + log(0.7)
-    d[2:(nyear-1)] <- runif(nyear-2, d[nyear], d[1])
-    d[2:(nyear-1)] <- sort(d[2:(nyear-1)], decreasing = TRUE)
-  }
   
   for (i in 1:(nspecies+1)) {
     a[,i] <- rnorm(nsite, 0, var_params)
@@ -43,25 +34,37 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (j in 1:nsite) {
     for (t in 1:nyear) {
       while (sum(a[j,]+b[t,]>12.2)>0) {
-        for (i in 1:(nspecies+1)) {
-          a[,i] <- rnorm(nsite, 0, var_params)
-          b[,i] <- rnorm(nyear, 0, var_params)
-        }
+          a[j,] <- rnorm(nspecies+1, 0, var_params)
+          b[t,] <- rnorm(nspecies+1, 0, var_params)
       }
     }
   }
   
-  if (decline) {b[,1] <- d}
-  
   for (j in 1:nsite) {
+    lambda[j,1,1] <- exp(a[j,1]+b[1,1])
+    if (decline) {
+      y[j,1,1] <- rpois(1, lambda[j,1,1])
+      if (nb) {y[j,1,1] <- rnbinom(1, lambda[j,1,1], 0.425)}
+      y[j,nyear,1] <- round(0.7*y[j,1,1])
+      y[j,2:(nyear-1),1] <- round(runif(nyear-2, y[j,nyear,1], y[j,1,1]))
+      y[j,2:(nyear-1),1] <- sort(y[j,2:(nyear-1),1], decreasing = TRUE)
+    }  else {for (t in 1:nyear) {
+        lambda[j,t,1] <- exp(a[j,1]+b[t,1])
+        f1 <- function(x) rpois(1,x)
+        y[j,t,1] <- sapply(lambda[j,t,1], f1)
+        if (nb) {
+          f11 <- function(x, r=0.425) rnbinom(1,x,r)
+          y[j,t,1] <- sapply(lambda[j,t,1], f11)
+        }
+    }}
     for (t in 1:nyear) {
-      lambda[j,t,] <- exp(a[j,]+b[t,])
-      f1 <- function(x) rpois(1,x)
-      y[j,t,] <- sapply(lambda[j,t,], f1)
-      if (nb) {
-        f11 <- function(x, r=0.425) rnbinom(1,x,r)
-        y[j,t,] <- sapply(lambda[j,t,], f11)
-      }
+        lambda[j,t,2:(nspecies+1)] <- exp(a[j,2:(nspecies+1)]+b[t,2:(nspecies+1)])
+        f1 <- function(x) rpois(1,x)
+        y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f1)
+        if (nb) {
+          f11 <- function(x, r=0.425) rnbinom(1,x,r)
+          y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f11)
+        }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
       nvisits <- rbinom(1, mv, richness)
@@ -126,24 +129,38 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (j in 1:nsite) {
     for (t in 1:nyear) {
       while (sum(a[j,]+b[t,]>12.2)>0) {
-        for (i in 1:(nspecies+1)) {
-          a[,i] <- rnorm(nsite, 0, var_params)
-          b[,i] <- rnorm(nyear, 0, var_params)
-        }
+          a[j,] <- rnorm(nspecies+1, 0, var_params)
+          b[t,] <- rnorm(nspecies+1, 0, var_params)
       }
     }
   }
   
-  if (decline) {b[,1] <- d}
+  #if (decline) {b[,1] <- d}
   
   for (j in 1:nsite) {
-    for (t in 1:nyear) {
-      lambda[j,t,] <- exp(a[j,]+b[t,])
+    lambda[j,1,1] <- exp(a[j,1]+b[1,1])
+    if (decline) {
+      y[j,1,1] <- rpois(1, lambda[j,1,1])
+      if (nb) {y[j,1,1] <- rnbinom(1, lambda[j,1,1], 0.425)}
+      y[j,nyear,1] <- round(0.7*y[j,1,1])
+      y[j,2:(nyear-1),1] <- round(runif(nyear-2, y[j,nyear,1], y[j,1,1]))
+      y[j,2:(nyear-1),1] <- sort(y[j,2:(nyear-1),1], decreasing = TRUE)
+    }  else {for (t in 1:nyear) {
+      lambda[j,t,1] <- exp(a[j,1]+b[t,1])
       f1 <- function(x) rpois(1,x)
-      y[j,t,] <- sapply(lambda[j,t,], f1)
+      y[j,t,1] <- sapply(lambda[j,t,1], f1)
       if (nb) {
         f11 <- function(x, r=0.425) rnbinom(1,x,r)
-        y[j,t,] <- sapply(lambda[j,t,], f11)
+        y[j,t,1] <- sapply(lambda[j,t,1], f11)
+      }
+    }}
+    for (t in 1:nyear) {
+      lambda[j,t,2:(nspecies+1)] <- exp(a[j,2:(nspecies+1)]+b[t,2:(nspecies+1)])
+      f1 <- function(x) rpois(1,x)
+      y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f11)
       }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
@@ -204,26 +221,40 @@ create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (j in 1:nsite) {
     for (t in 1:nyear) {
       while (sum(a[j,]+b[t,]>12.2)>0) {
-        for (i in 1:(nspecies+1)) {
-          a[,i] <- rnorm(nsite, 0, var_params)
-          b[,i] <- rnorm(nyear, 0, var_params)
-        }
+          a[j,] <- rnorm(nspecies+1, 0, var_params)
+          b[t,] <- rnorm(nspecies+1, 0, var_params)
       }
     }
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
   
-  if (decline) {b[,1] <- d}
+  #if (decline) {b[,1] <- d}
   
   for (j in 1:nsite) {
-    for (t in 1:nyear) {
-      lambda[j,t,] <- exp(a[j,]+b[t,])
+    lambda[j,1,1] <- exp(a[j,1]+b[1,1])
+    if (decline) {
+      y[j,1,1] <- rpois(1, lambda[j,1,1])
+      if (nb) {y[j,1,1] <- rnbinom(1, lambda[j,1,1], 0.425)}
+      y[j,nyear,1] <- round(0.7*y[j,1,1])
+      y[j,2:(nyear-1),1] <- round(runif(nyear-2, y[j,nyear,1], y[j,1,1]))
+      y[j,2:(nyear-1),1] <- sort(y[j,2:(nyear-1),1], decreasing = TRUE)
+    }  else {for (t in 1:nyear) {
+      lambda[j,t,1] <- exp(a[j,1]+b[t,1])
       f1 <- function(x) rpois(1,x)
-      y[j,t,] <- sapply(lambda[j,t,], f1)
+      y[j,t,1] <- sapply(lambda[j,t,1], f1)
       if (nb) {
         f11 <- function(x, r=0.425) rnbinom(1,x,r)
-        y[j,t,] <- sapply(lambda[j,t,], f11)
+        y[j,t,1] <- sapply(lambda[j,t,1], f11)
+      }
+    }}
+    for (t in 1:nyear) {
+      lambda[j,t,2:(nspecies+1)] <- exp(a[j,2:(nspecies+1)]+b[t,2:(nspecies+1)])
+      f1 <- function(x) rpois(1,x)
+      y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f11)
       }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
@@ -302,24 +333,38 @@ create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (j in 1:nsite) {
     for (t in 1:nyear) {
       while (sum(a[j,]+b[t,]>12.2)>0) {
-        for (i in 1:(nspecies+1)) {
-          a[,i] <- rnorm(nsite, 0, var_params)
-          b[,i] <- rnorm(nyear, 0, var_params)
-        }
+          a[j,] <- rnorm(nspecies+1, 0, var_params)
+          b[t,] <- rnorm(nspecies+1, 0, var_params)
       }
     }
   }
   
-  if (decline) {b[,1] <- d}
+  #if (decline) {b[,1] <- d}
   
   for (j in 1:nsite) {
-    for (t in 1:nyear) {
-      lambda[j,t,] <- exp(a[j,]+b[t,])
+    lambda[j,1,1] <- exp(a[j,1]+b[1,1])
+    if (decline) {
+      y[j,1,1] <- rpois(1, lambda[j,1,1])
+      if (nb) {y[j,1,1] <- rnbinom(1, lambda[j,1,1], 0.425)}
+      y[j,nyear,1] <- round(0.7*y[j,1,1])
+      y[j,2:(nyear-1),1] <- round(runif(nyear-2, y[j,nyear,1], y[j,1,1]))
+      y[j,2:(nyear-1),1] <- sort(y[j,2:(nyear-1),1], decreasing = TRUE)
+    }  else {for (t in 1:nyear) {
+      lambda[j,t,1] <- exp(a[j,1]+b[t,1])
       f1 <- function(x) rpois(1,x)
-      y[j,t,] <- sapply(lambda[j,t,], f1)
+      y[j,t,1] <- sapply(lambda[j,t,1], f1)
       if (nb) {
         f11 <- function(x, r=0.425) rnbinom(1,x,r)
-        y[j,t,] <- sapply(lambda[j,t,], f11)
+        y[j,t,1] <- sapply(lambda[j,t,1], f11)
+      }
+    }}
+    for (t in 1:nyear) {
+      lambda[j,t,2:(nspecies+1)] <- exp(a[j,2:(nspecies+1)]+b[t,2:(nspecies+1)])
+      f1 <- function(x) rpois(1,x)
+      y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f11)
       }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
@@ -395,24 +440,38 @@ create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (j in 1:nsite) {
     for (t in 1:nyear) {
       while (sum(a[j,]+b[t,]>12.2)>0) {
-        for (i in 1:(nspecies+1)) {
-          a[,i] <- rnorm(nsite, 0, var_params)
-          b[,i] <- rnorm(nyear, 0, var_params)
-        }
+          a[j,] <- rnorm(nspecies+1, 0, var_params)
+          b[t,] <- rnorm(nspecies+1, 0, var_params)
       }
     }
   }
   
-  if (decline) {b[,1] <- d}
+  #if (decline) {b[,1] <- d}
   
   for (j in 1:nsite) {
-    for (t in 1:nyear) {
-      lambda[j,t,] <- exp(a[j,]+b[t,])
+    lambda[j,1,1] <- exp(a[j,1]+b[1,1])
+    if (decline) {
+      y[j,1,1] <- rpois(1, lambda[j,1,1])
+      if (nb) {y[j,1,1] <- rnbinom(1, lambda[j,1,1], 0.425)}
+      y[j,nyear,1] <- round(0.7*y[j,1,1])
+      y[j,2:(nyear-1),1] <- round(runif(nyear-2, y[j,nyear,1], y[j,1,1]))
+      y[j,2:(nyear-1),1] <- sort(y[j,2:(nyear-1),1], decreasing = TRUE)
+    }  else {for (t in 1:nyear) {
+      lambda[j,t,1] <- exp(a[j,1]+b[t,1])
       f1 <- function(x) rpois(1,x)
-      y[j,t,] <- sapply(lambda[j,t,], f1)
+      y[j,t,1] <- sapply(lambda[j,t,1], f1)
       if (nb) {
         f11 <- function(x, r=0.425) rnbinom(1,x,r)
-        y[j,t,] <- sapply(lambda[j,t,], f11)
+        y[j,t,1] <- sapply(lambda[j,t,1], f11)
+      }
+    }}
+    for (t in 1:nyear) {
+      lambda[j,t,2:(nspecies+1)] <- exp(a[j,2:(nspecies+1)]+b[t,2:(nspecies+1)])
+      f1 <- function(x) rpois(1,x)
+      y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f1)
+      if (nb) {
+        f11 <- function(x, r=0.425) rnbinom(1,x,r)
+        y[j,t,2:(nspecies+1)] <- sapply(lambda[j,t,2:(nspecies+1)], f11)
       }
       richness <- length(which(y[j,t,]!=0))/(nspecies+1)
       
