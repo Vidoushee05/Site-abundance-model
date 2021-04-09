@@ -16,7 +16,7 @@ match_df <- function (x, y, on = NULL) {
 ###############################################
 
 # with visits
-create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
+create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=2){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -27,7 +27,7 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (i in 1:(nspecies+1)) {
     a[,i] <- rnorm(nsite, 0, var_params)
     b[,i] <- rnorm(nyear, 0, var_params)
-    p_detect[i] <- rbeta(1, 2, 2)
+    p_detect[i] <- runif(1,0.16,0.88)
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
@@ -104,7 +104,7 @@ create_data2 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # simulating increase in prob of focal detection
-create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
+create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=2){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -124,7 +124,7 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (i in 1:(nspecies+1)) {
     a[,i] <- rnorm(nsite, 0, var_params)
     b[,i] <- rnorm(nyear, 0, var_params)
-    p_detect[,i] <- rbeta(1, 2, 2)
+    p_detect[,i] <- runif(1,0.16,0.88)
   }
   
   # detection increases
@@ -206,7 +206,7 @@ create_data3 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # reduced recording effort
-create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
+create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=2){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -226,7 +226,7 @@ create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (i in 1:(nspecies+1)) {
     a[,i] <- rnorm(nsite, 0, var_params)
     b[,i] <- rnorm(nyear, 0, var_params)
-    p_detect[i] <- rbeta(1, 2, 2)
+    p_detect[i] <- runif(1,0.16,0.88)
   }
   
   for (j in 1:nsite) {
@@ -320,7 +320,7 @@ create_data4 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # visits double over 10 years
-create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
+create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=2){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -340,7 +340,7 @@ create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (i in 1:(nspecies+1)) {
     a[,i] <- rnorm(nsite, 0, var_params)
     b[,i] <- rnorm(nyear, 0, var_params)
-    p_detect[i] <- rbeta(1, 2, 2)
+    p_detect[i] <- runif(1,0.16,0.88)
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
@@ -431,7 +431,7 @@ create_data5 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
 ##############################################
 
 # increased visits biased towards focal
-create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=3){
+create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, nb=FALSE, var_params=2){
   simdata <- data.frame()
   a <- matrix(nrow = nsite, ncol=nspecies+1)
   b <- matrix(nrow = nyear, ncol=nspecies+1)
@@ -451,7 +451,7 @@ create_data6 <- function(nspecies=20, nsite=50, nyear=10, mv=10, decline=FALSE, 
   for (i in 1:(nspecies+1)) {
     a[,i] <- rnorm(nsite, 0, var_params)
     b[,i] <- rnorm(nyear, 0, var_params)
-    p_detect[i] <- rbeta(1, 2, 2)
+    p_detect[i] <- runif(1,0.16,0.88)
   }
   
   p_detect[1] <- 0.5  #fixed prob of detection for focal
@@ -580,7 +580,7 @@ run_model <- function(simdata, species_list=1, model="SI_model.bug", n_chains=3,
 ##############################################
 
 # function to run 100 simulations and record error rate/power
-assess_model <- function(nsims=100, scenarios="ABCDE", species_list=1, model="SI_model.bug", n_chains=3, n_iter=5000) {
+assess_model <- function(nsims=100, scenarios="ABCDE", species_list=1, model="SI_model.bug", n_chains=3, n_iter=5000, nb=FALSE) {
   results <- list()
   create <- list(create_data2, create_data3, create_data4,
                  create_data5, create_data6)
@@ -593,7 +593,7 @@ assess_model <- function(nsims=100, scenarios="ABCDE", species_list=1, model="SI
       miss <- c()
       
       for (i in 1:nsims) {
-        data <- create[[which(LETTERS==s)]](decline=FALSE)
+        data <- create[[which(LETTERS==s)]](decline=FALSE, nb=nb)
         simdata <- data[[1]]
         
         out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
@@ -610,7 +610,7 @@ assess_model <- function(nsims=100, scenarios="ABCDE", species_list=1, model="SI
       }
       
       for (i in 1:nsims) {
-        data <- create[[which(LETTERS==s)]](decline=TRUE)
+        data <- create[[which(LETTERS==s)]](decline=TRUE, nb=nb)
         simdata <- data[[1]]
         
         out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
