@@ -1,0 +1,39 @@
+model {
+  for (j in 1:nsite) {
+    for (t in 1:nyear) {
+      y[j,t] ~ dpois(mu[j,t])
+      
+      mu[j,t] <- exp(a[j] + b[t] + c)
+
+      z[j,t] <- ifelse(y[j,t]>0, 1, 0)
+    }
+  }
+  
+  for (v in 1:nvisit) {
+    SI[v] ~ dbin(p[v], y[Site[v], Year[v]])
+    #P[v] <- z[Site[v], Year[v]] * p[v]
+    p[v] ~ dunif(0,1)
+  }
+  
+  for (j in 1:nsite) {
+    a[j] ~ dnorm(mu.a[j],tau.a)
+    mu.a[j] ~ dnorm(0,1/100)
+
+  }
+  
+  for (t in 1:nyear) {
+    b[t] ~ dnorm(mu.b[t],tau.b)
+    mu.b[t] ~ dnorm(0,1/100)
+    
+  }
+  
+  tau.a <- 1/(sd.a*sd.a)
+  sd.a ~ dunif(0,10)
+  tau.b <- 1/(sd.b*sd.b)
+  sd.b ~ dunif(0,10)
+  
+  c ~ dnorm(0, tau.c)
+  tau.c <- 1/(sd.c*sd.c)
+  sd.c ~ dunif(0,1E6)
+
+}
