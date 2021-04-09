@@ -5,7 +5,7 @@ model {
       
       y[j,t] ~ dpois(mu[j,t])
       
-      lambda[j,t] <- mu[j,t] * p[j,t] * z[j,t]
+      #lambda[j,t] <- mu[j,t] * p[j,t] * z[j,t]
 
       p[j,t] ~ dunif(0,1)
       #logit(p[j,t]) <- v[t]
