@@ -507,3 +507,21 @@ assess_occmodel <- function(nsims=100, scenarios="ABCDE", species_list=1,
   
   return(results)
 }
+
+##############################################
+
+# plot Type I error rate
+plot_alpha <- function(reslist) {
+  nam <- names(unlist(reslist))
+  alpha <- unlist(reslist)[which(grepl("alpha", nam))]
+  
+  x <- data.frame(names=names(alpha), alpha)
+  x$names <- c("Control", "Detect", "Effort", "Visits", "Visits+Bias")
+  
+  p <- ggplot(data=x, aes(x=names, y=alpha, fill=names)) + geom_bar(stat="identity") + 
+    geom_hline(yintercept = 0.05, linetype="dashed") + ylim(0,0.15) +
+    theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
+    xlab("") + ylab("Type I error rate") + labs(fill="Scenario")
+  
+  return(p)
+}
