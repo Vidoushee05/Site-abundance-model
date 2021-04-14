@@ -525,3 +525,21 @@ plot_alpha <- function(reslist) {
   
   return(p)
 }
+
+##############################################
+
+# plot power
+plot_power <- function(reslist) {
+  nam <- names(unlist(reslist))
+  power <- unlist(reslist)[which(grepl("power", nam))]
+  
+  x <- data.frame(names=names(power), power)
+  x$names <- c("Control", "Detect", "Effort", "Visits", "Visits+Bias")
+  
+  p <- ggplot(data=x, aes(x=names, y=power, fill=names)) + geom_bar(stat="identity") + 
+    ylim(0,1) +
+    theme(axis.text.x = element_blank(), axis.ticks = element_blank()) +
+    xlab("") + ylab("Power") + labs(fill="Scenario")
+  
+  return(p)
+}
