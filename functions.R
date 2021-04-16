@@ -427,13 +427,20 @@ assess_occmodel <- function(nsims=100, scenarios="ABCDE", species_list=1,
         data <- create[[which(LETTERS==s)]](decline=FALSE, nb=nb)
         simdata <- data[[1]]
         
-        vis <- unique(simdata[, c("visit", "year")])
+        if (nrow(simdata)==0) {
+          print("No records.") 
+          test2[i] <- NA
+          print(paste0("Scenario ", s, " + no trend: simulation ", i, " completed."))
+        }
+        
+        else {vis <- unique(simdata[, c("visit", "year")])
         vis$dates <- 0
         nyear <- length(unique(simdata$year))
         sub1 <- data.frame()
         
         for (t in 1:nyear) {
           sub <- subset(vis, year==t)
+          if (nrow(sub)==0) {next}
           date_begin <- as.Date(paste0(2000+t, "-01-01"))
           date_end <- as.Date(paste0(2000+t,"-12-31"))
           rdates <- date_begin + (runif(nrow(sub))*(date_end-date_begin))
@@ -456,14 +463,21 @@ assess_occmodel <- function(nsims=100, scenarios="ABCDE", species_list=1,
           lntrend <- summary(lm(mean~year, data=est))
           test1[i] <- lntrend$coefficients[2,4]<0.05
           print(paste0("Scenario ", s, " + no trend: simulation ", i, " completed."))
-        }
+        }}
+        
       }
       
       for (i in 1:nsims) {
         data <- create[[which(LETTERS==s)]](decline=TRUE, nb=nb)
         simdata <- data[[1]]
         
-        vis <- unique(simdata[, c("visit", "year")])
+        if (nrow(simdata)==0) {
+          print("No records.") 
+          test2[i] <- NA
+          print(paste0("Scenario ", s, " + no trend: simulation ", i, " completed."))
+        }
+        
+        else {vis <- unique(simdata[, c("visit", "year")])
         vis$dates <- 0
         nyear <- length(unique(simdata$year))
         sub1 <- data.frame()
@@ -493,6 +507,8 @@ assess_occmodel <- function(nsims=100, scenarios="ABCDE", species_list=1,
           test2[i] <- lntrend$coefficients[2,4]<0.05
           print(paste0("Scenario ", s, " + decline: simulation ", i, " completed."))
         }
+      }
+        
       }
       
       test1 <- na.omit(test1)
