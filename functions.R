@@ -5,6 +5,7 @@ require(dplyr)
 require(plyr)
 require(MASS)
 require(sparta)
+require(ggplot2)
 
 match_df <- function (x, y, on = NULL) {
   if (is.null(on)) {
