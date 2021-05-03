@@ -284,11 +284,10 @@ for (j in 1:nsite) {
   }
 }
 
-for (i in 1:10) {x[i] <- mean(subset(simdata, species==1 & year==i)$obs)}
+for (i in 1:10) {x[i] <- mean(subset(simdata, species==1 & year==i)$actual)}
 for (i in 1:10) {x[i] <- mean(subset(simdata, species=="species1" & year==paste0("year", i))$actual)}
 
-
-data <- create_data2(decline=FALSE, nb=FALSE)
+data <- create_data6(decline=FALSE, nb=FALSE)
 simdata <- data[[1]]
 
 out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
@@ -302,6 +301,8 @@ est <- as.data.frame(est)
 est$year <- 1:nyear
 est$actual <- actual
 
+summary(lm(mean~year, data=est))
+
 p <- ggplot(est, aes(year, mean)) + geom_line(aes(color="Estimated")) +
   geom_ribbon(data=est, aes(ymin=`2.5%`, ymax=`97.5%`), alpha=0.3) + 
   geom_point(data=est, aes(year, actual, color="Actual")) + ylab("b_t") +
@@ -309,16 +310,16 @@ p <- ggplot(est, aes(year, mean)) + geom_line(aes(color="Estimated")) +
   theme(legend.title = element_blank()) 
 
 ##################################################
+source("functions.R")
+nsims = 100
+scenarios = "C"
 
-nsims = 1
-scenarios = "ABCDE"
 results <- list()
-
 create <- list(create_data2, create_data3, create_data4,
                create_data5, create_data6)
 
 for (s in LETTERS[1:5]) {
-
+  
   if (grepl(s, scenarios)) {
     test1 <- c()
     test2 <- c()
@@ -328,9 +329,10 @@ for (s in LETTERS[1:5]) {
       data <- create[[which(LETTERS==s)]](decline=FALSE)
       simdata <- data[[1]]
       
-      out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
+      out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
       miss[i] <- out[[2]][[1]]
       
+      nyear <- formals(create[[which(LETTERS==s)]])$nyear
       est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
       est <- as.data.frame(est)
       est$year <- 1:nyear
@@ -344,9 +346,11 @@ for (s in LETTERS[1:5]) {
       data <- create[[which(LETTERS==s)]](decline=TRUE)
       simdata <- data[[1]]
       
-      out <- run_model(simdata, species_list = c(1), n_chains=3, n_iter=5000)
+      
+      out <- run_model(simdata, species_list = species_list, model = model, n_chains=n_chains, n_iter=n_iter)
       miss[nsims+1] <- out[[2]][[1]]
       
+      nyear <- formals(create[[which(LETTERS==s)]])$nyear
       est <- out[[1]][[1]]$BUGSoutput$summary[paste0("b[", 1:nyear, "]"), c(1,3,7,8)]
       est <- as.data.frame(est)
       est$year <- 1:nyear
@@ -365,5 +369,18 @@ for (s in LETTERS[1:5]) {
   }
 }
 
-resultsA <- assess_model(scenarios = "A")
-save(resultsA, file="results/Control.rdata")
+
+resultsA2 <- assess_model(scenarios = "A", nb=TRUE)
+save(resultsA2, file="results/Controlnb.rdata")
+
+resultsB2 <- assess_model(scenarios = "B", nb=TRUE)
+save(resultsB2, file="results/Detectnb.rdata")
+
+resultsC2 <- assess_model(scenarios = "C", nb=TRUE)
+save(resultsC2, file="results/Effortnb.rdata")
+
+resultsD <- assess_model(scenarios = "D")
+save(resultsD, file="results/Visits.rdata")
+
+####################################################
+
